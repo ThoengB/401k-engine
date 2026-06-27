@@ -1,15 +1,39 @@
 import os
+import tomllib
+from pathlib import Path
 
 import pandas as pd
 import psycopg2
 import streamlit as st
 
+SECRETS_PATH = Path(__file__).resolve().parent / ".streamlit" / "secrets.toml"
+
+
+def _read_secrets_file() -> dict:
+    if not SECRETS_PATH.exists():
+        return {}
+    with SECRETS_PATH.open("rb") as secrets_file:
+        return tomllib.load(secrets_file)
+
 
 def get_db_url():
+    url = None
     try:
-        return st.secrets["DB_URL"]
-    except (KeyError, FileNotFoundError):
-        return os.environ.get("DB_URL") or os.environ.get("SUPABASE_DB_URL")
+        if "DB_URL" in st.secrets:
+            url = st.secrets["DB_URL"]
+        elif "SUPABASE_DB_URL" in st.secrets:
+            url = st.secrets["SUPABASE_DB_URL"]
+    except FileNotFoundError:
+        pass
+
+    if not url:
+        secrets = _read_secrets_file()
+        url = secrets.get("DB_URL") or secrets.get("SUPABASE_DB_URL")
+
+    if not url:
+        url = os.environ.get("DB_URL") or os.environ.get("SUPABASE_DB_URL")
+
+    return url.strip() if url else None
 
 
 @st.cache_resource

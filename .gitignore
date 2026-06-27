@@ -4,3 +4,7 @@ secrets.toml
 
 # Local environment
 .env
+
+# Python
+__pycache__/
+*.pyc
