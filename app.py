@@ -10,9 +10,8 @@ st.title("🎯 401k SaaS Lead Generation Engine")
 @st.cache_resource
 def get_db_connection():
     try:
-        # st.secrets pulls the value you set in Streamlit Cloud -> Manage App -> Settings -> Secrets
+        # Pulls the perfectly formatted string from Streamlit Secrets
         db_url = st.secrets["DB_URL"]
-        # connect_timeout is critical to prevent infinite hanging
         return psycopg2.connect(db_url, connect_timeout=10)
     except Exception as e:
         st.error(f"Connection failed: {e}")
@@ -39,7 +38,7 @@ if st.button("Load Lead Data"):
     with st.spinner("Fetching data from Supabase..."):
         data = load_lead_data()
         if not data.empty:
-            st.write("Lead Data Loaded Successfully:")
+            st.success("Lead Data Loaded Successfully!")
             st.dataframe(data)
         else:
             st.warning("No data found or connection failed.")
