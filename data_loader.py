@@ -36,7 +36,6 @@ def get_db_url():
     return url.strip() if url else None
 
 
-@st.cache_resource
 def get_db_connection():
     db_url = get_db_url()
     if not db_url:
