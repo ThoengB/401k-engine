@@ -1,43 +1,10 @@
-import os
-
-import pandas as pd
-import psycopg2
 import streamlit as st
+
+from data_loader import load_lead_data, save_hidden_goldmine_flags
+from scoring import add_lead_scores
 
 st.set_page_config(page_title="401k Lead Engine", layout="wide")
 st.title("🎯 401k SaaS Lead Generation Engine")
-
-
-def get_db_url():
-    try:
-        return st.secrets["DB_URL"]
-    except (KeyError, FileNotFoundError):
-        return os.environ.get("DB_URL") or os.environ.get("SUPABASE_DB_URL")
-
-
-@st.cache_resource
-def get_db_connection():
-    db_url = get_db_url()
-    if not db_url:
-        st.error("DB_URL not configured. Set it in Streamlit secrets or your environment.")
-        return None
-    try:
-        return psycopg2.connect(db_url, connect_timeout=10)
-    except Exception as e:
-        st.error(f"Could not connect to DB: {e}")
-        return None
-
-
-@st.cache_data(ttl=600)
-def load_lead_data():
-    conn = get_db_connection()
-    if conn is None:
-        return pd.DataFrame()
-    try:
-        return pd.read_sql("SELECT * FROM v_smart_lead_scoring;", conn)
-    finally:
-        conn.close()
-
 
 try:
     df = load_lead_data()
@@ -45,10 +12,7 @@ try:
     if df.empty:
         st.info("No lead data found. Check your database connection and view.")
     else:
-        df["lead_score"] = (
-            (df["total_assets"] / df["total_assets"].max()) * 50
-            + (1 - (df["total_fees"] / (df["total_assets"] + 1))) * 50
-        ).round(0)
+        df = add_lead_scores(df)
 
         st.sidebar.header("Filter Prospects")
 
@@ -101,24 +65,11 @@ try:
         )
 
         if st.button("Save Changes to Database"):
-            conn = get_db_connection()
-            if conn is None:
-                st.error("Could not connect to save changes.")
+            success, error = save_hidden_goldmine_flags(edited_df)
+            if success:
+                st.success("Changes saved!")
             else:
-                try:
-                    with conn.cursor() as cur:
-                        for _, row in edited_df.iterrows():
-                            cur.execute(
-                                "UPDATE v_smart_lead_scoring SET is_hidden_goldmine = %s WHERE id = %s",
-                                (row["is_hidden_goldmine"], row["id"]),
-                            )
-                    conn.commit()
-                    st.success("Changes saved!")
-                    st.cache_data.clear()
-                except Exception as e:
-                    st.error(f"Save failed: {e}")
-                finally:
-                    conn.close()
+                st.error(f"Save failed: {error}")
 
 except Exception as e:
     st.error(f"Failed to load dashboard data: {e}")
